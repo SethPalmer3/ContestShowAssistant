@@ -1,0 +1,296 @@
+{% extends "ui/base.html" %}
+
+{% block title %}Setup Dashboard{% endblock %}
+
+{% block content %}
+    <h1>Setup Manager</h1>
+    
+    <div style="margin-bottom: 2rem; padding: 1rem; background: #f8f9fa; border: 1px solid #ddd;">
+        <h3>Server State</h3>
+        <p>Active Show: <strong id="active-show">Loading...</strong></p>
+    </div>
+
+    <div id="setup-controls" style="display: none;">
+        
+        <div style="display: flex; gap: 2rem; flex-wrap: wrap;">
+            <!-- Left Column: Individuals -->
+            <div style="flex: 1; min-width: 300px; padding: 1rem; border: 1px solid #ccc; background: #fff;">
+                <h2>1. Add Individual Contestant</h2>
+                <div id="individual-status"></div>
+                <form id="add-contestant-form">
+                    <p>
+                        <label>Name:</label><br>
+                        <input type="text" id="contestant-name" required>
+                    </p>
+                    <p>
+                        <label>Show Number (Bib/Jersey):</label><br>
+                        <input type="number" id="contestant-number" required>
+                    </p>
+                    <p>
+                        <label><strong>Enroll in Events:</strong></label><br>
+                        <div id="individual-event-checkboxes" style="margin-top: 0.5rem; padding: 1rem; border: 1px solid #ddd; max-height: 150px; overflow-y: auto;">
+                            Loading events...
+                        </div>
+                    </p>
+                    <button type="submit" class="btn">Save Contestant</button>
+                </form>
+            </div>
+
+            <!-- Right Column: Groups -->
+            <div style="flex: 1; min-width: 300px; padding: 1rem; border: 1px solid #ccc; background: #fff;">
+                <h2>2. Create Group / Team</h2>
+                <div id="group-status"></div>
+                <form id="add-group-form">
+                    <p>
+                        <label>Group Name:</label><br>
+                        <input type="text" id="group-name" required>
+                    </p>
+                    <p>
+                        <label><strong>Enroll in Events:</strong></label><br>
+                        <div id="group-event-checkboxes" style="margin-top: 0.5rem; padding: 1rem; border: 1px solid #ddd; max-height: 150px; overflow-y: auto;">
+                            Loading events...
+                        </div>
+                    </p>
+                    <p>
+                        <label><strong>Select Members:</strong></label><br>
+                        <div id="group-member-checkboxes" style="margin-top: 0.5rem; padding: 1rem; border: 1px solid #ddd; max-height: 150px; overflow-y: auto;">
+                            Loading members...
+                        </div>
+                    </p>
+                    <button type="submit" class="btn">Save Group</button>
+                </form>
+            </div>
+        </div>
+
+        <hr style="margin: 2rem 0;">
+
+        <!-- Rosters -->
+        <div style="display: flex; gap: 2rem; flex-wrap: wrap;">
+            <div style="flex: 1;">
+                <h3>Registered Contestants</h3>
+                <ul id="contestant-list">Loading...</ul>
+            </div>
+            <div style="flex: 1;">
+                <h3>Registered Groups</h3>
+                <ul id="group-list">Loading...</ul>
+            </div>
+        </div>
+    </div>
+
+    <p id="no-show-warning" style="color: red; display: none;">
+        No active show is set. Please set an active show in the Admin panel to add contestants.
+    </p>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let currentShowId = null;
+    let allContestants = []; // Store contestants globally so we can filter them dynamically
+
+    async function initSetup() {
+        try {
+            const stateRes = await fetch('/api/state/');
+            const stateData = await stateRes.json();
+            
+            const showDisplay = document.getElementById('active-show');
+            const setupControls = document.getElementById('setup-controls');
+            const warning = document.getElementById('no-show-warning');
+
+            if (stateData.current_show_id) {
+                currentShowId = stateData.current_show_id;
+                showDisplay.innerText = stateData.current_show;
+                setupControls.style.display = 'block';
+                warning.style.display = 'none';
+                
+                loadEvents();
+                loadContestants();
+                loadGroups();
+            } else {
+                showDisplay.innerText = "None";
+                setupControls.style.display = 'none';
+                warning.style.display = 'block';
+            }
+        } catch (error) {
+            console.error("Error fetching state:", error);
+        }
+    }
+
+    async function loadEvents() {
+        if (!currentShowId) return;
+        try {
+            const res = await fetch(`/api/shows/${currentShowId}/events/`);
+            const data = await res.json();
+            
+            const individualEvents = data.filter(e => e.group_size === 1);
+            const groupEvents = data.filter(e => e.group_size > 1);
+            
+            document.getElementById('individual-event-checkboxes').innerHTML = individualEvents.length === 0 
+                ? '<em>No individual events found.</em>' 
+                : individualEvents.map(e => `<div><label><input type="checkbox" value="${e.id}"> ${e.name}</label></div>`).join('');
+                
+            document.getElementById('group-event-checkboxes').innerHTML = groupEvents.length === 0 
+                ? '<em>No group events found.</em>' 
+                : groupEvents.map(e => `<div><label><input type="checkbox" value="${e.id}" data-size="${e.group_size}"> ${e.name} (Required Size: ${e.group_size})</label></div>`).join('');
+                
+        } catch (error) {
+            console.error("Failed to load events");
+        }
+    }
+
+    async function loadContestants() {
+        if (!currentShowId) return;
+        try {
+            const res = await fetch(`/api/shows/${currentShowId}/contestants/`);
+            allContestants = await res.json(); // Save data globally
+            
+            // Render the roster list
+            const listHtml = allContestants.length === 0 ? '<li>No contestants added yet.</li>' : allContestants.map(c => `<li>#${c.show_number} - ${c.name}</li>`).join('');
+            document.getElementById('contestant-list').innerHTML = listHtml;
+            
+            // Build the dynamic checkbox list
+            renderGroupMembers();
+        } catch (error) {
+            console.error("Failed to load contestants");
+        }
+    }
+    
+    // NEW: Function to dynamically rebuild the member checkboxes based on selected events
+    function renderGroupMembers() {
+        const container = document.getElementById('group-member-checkboxes');
+        const selectedEventIds = Array.from(document.querySelectorAll('#group-event-checkboxes input:checked')).map(cb => parseInt(cb.value));
+        
+        if (allContestants.length === 0) {
+            container.innerHTML = '<em>No contestants available.</em>';
+            return;
+        }
+
+        // Filter the contestants to only those enrolled in ALL selected group events
+        let visibleContestants = allContestants;
+        if (selectedEventIds.length > 0) {
+            visibleContestants = allContestants.filter(c => {
+                return selectedEventIds.every(eventId => c.events.includes(eventId));
+            });
+        }
+
+        if (visibleContestants.length === 0) {
+            container.innerHTML = '<em style="color: #666;">No contestants are enrolled in the selected event(s).</em>';
+            return;
+        }
+
+        // Preserve currently checked boxes so they aren't lost when filtering
+        const currentlyChecked = Array.from(container.querySelectorAll('input:checked')).map(cb => parseInt(cb.value));
+
+        container.innerHTML = visibleContestants.map(c => {
+            const isChecked = currentlyChecked.includes(c.id) ? 'checked' : '';
+            return `<div><label><input type="checkbox" value="${c.id}" ${isChecked}> #${c.show_number} - ${c.name}</label></div>`;
+        }).join('');
+    }
+
+    // Trigger the filter function whenever an event checkbox is checked/unchecked
+    document.getElementById('group-event-checkboxes').addEventListener('change', renderGroupMembers);
+
+    async function loadGroups() {
+        if (!currentShowId) return;
+        try {
+            const res = await fetch(`/api/shows/${currentShowId}/groups/`);
+            const data = await res.json();
+            const listHtml = data.length === 0 ? '<li>No groups added yet.</li>' : data.map(g => `<li><strong>${g.name}</strong> (${g.members.join(', ')})</li>`).join('');
+            document.getElementById('group-list').innerHTML = listHtml;
+        } catch (error) {
+            console.error("Failed to load groups");
+        }
+    }
+
+    document.getElementById('add-contestant-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        if (!currentShowId) return;
+
+        const name = document.getElementById('contestant-name').value;
+        const number = document.getElementById('contestant-number').value;
+        const eventIds = Array.from(document.querySelectorAll('#individual-event-checkboxes input:checked')).map(cb => parseInt(cb.value));
+        const statusDiv = document.getElementById('individual-status');
+
+        try {
+            const res = await fetch(`/api/shows/${currentShowId}/contestants/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+                body: JSON.stringify({ name: name, show_number: number, events: eventIds })
+            });
+
+            const data = await res.json();
+            if (res.ok) {
+                statusDiv.innerHTML = `<p style="color: green;">${data.status}</p>`;
+                document.getElementById('contestant-name').value = '';
+                document.getElementById('contestant-number').value = '';
+                document.getElementById('contestant-name').focus();
+                loadContestants(); 
+                setTimeout(() => { statusDiv.innerHTML = ''; }, 3000);
+            } else {
+                statusDiv.innerHTML = `<p style="color: red;">Error: ${data.error}</p>`;
+            }
+        } catch (error) {
+            statusDiv.innerHTML = `<p style="color: red;">Network error.</p>`;
+        }
+    });
+
+    document.getElementById('add-group-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        if (!currentShowId) return;
+
+        const name = document.getElementById('group-name').value;
+        const memberIds = Array.from(document.querySelectorAll('#group-member-checkboxes input:checked')).map(cb => parseInt(cb.value));
+        const selectedEventCheckboxes = Array.from(document.querySelectorAll('#group-event-checkboxes input:checked'));
+        const eventIds = selectedEventCheckboxes.map(cb => parseInt(cb.value));
+        const statusDiv = document.getElementById('group-status');
+
+        if (selectedEventCheckboxes.length === 0) {
+            statusDiv.innerHTML = `<p style="color: red;">Error: Please select at least one event for this group.</p>`;
+            return;
+        }
+
+        const requiredSize = parseInt(selectedEventCheckboxes[0].getAttribute('data-size'));
+        
+        for (let cb of selectedEventCheckboxes) {
+            if (parseInt(cb.getAttribute('data-size')) !== requiredSize) {
+                statusDiv.innerHTML = `<p style="color: red;">Error: You selected events with different group sizes. Please create separate groups.</p>`;
+                return;
+            }
+        }
+
+        if (memberIds.length !== requiredSize) {
+            statusDiv.innerHTML = `<p style="color: red;">Error: These events require exactly ${requiredSize} members, but you selected ${memberIds.length}.</p>`;
+            return;
+        }
+
+        try {
+            const res = await fetch(`/api/shows/${currentShowId}/groups/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+                body: JSON.stringify({ name: name, members: memberIds, events: eventIds })
+            });
+
+            const data = await res.json();
+            if (res.ok) {
+                statusDiv.innerHTML = `<p style="color: green;">${data.status}</p>`;
+                document.getElementById('group-name').value = '';
+                
+                document.querySelectorAll('#group-member-checkboxes input:checked').forEach(cb => cb.checked = false);
+                document.querySelectorAll('#group-event-checkboxes input:checked').forEach(cb => cb.checked = false);
+                
+                loadGroups(); 
+                
+                // Re-render the members list to show everyone again since events were cleared
+                renderGroupMembers(); 
+                
+                setTimeout(() => { statusDiv.innerHTML = ''; }, 3000);
+            } else {
+                statusDiv.innerHTML = `<p style="color: red;">Error: ${data.error}</p>`;
+            }
+        } catch (error) {
+            statusDiv.innerHTML = `<p style="color: red;">Network error.</p>`;
+        }
+    });
+
+    initSetup();
+</script>
+{% endblock %}

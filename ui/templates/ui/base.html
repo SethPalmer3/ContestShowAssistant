@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Event Manager{% endblock %}</title>
+    <style>
+        body { font-family: sans-serif; margin: 2rem; max-width: 800px; }
+        .nav { margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 1px solid #ccc; }
+        .nav a { margin-right: 1rem; text-decoration: none; color: #0066cc; }
+        .btn { padding: 0.5rem 1rem; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="nav">
+        <a href="{% url 'ui_setup' %}">Setup</a>
+        <a href="{% url 'ui_score_keeper' %}">Score Keeper</a>
+        <a href="{% url 'ui_display' %}">Live Display</a>
+    </div>
+
+    <!-- This is where child templates will inject their content -->
+    {% block content %}{% endblock %}
+
+    <!-- Helper script to get the CSRF token for API POST requests -->
+    <script>
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+        const csrftoken = getCookie('csrftoken');
+    </script>
+    
+    {% block scripts %}{% endblock %}
+</body>
+</html>

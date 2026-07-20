@@ -1,0 +1,86 @@
+{% extends "ui/base.html" %}
+
+{% block title %}Live Event Standings{% endblock %}
+
+{% block content %}
+    <div style="text-align: center; margin-bottom: 2rem;">
+        <h1 id="event-name" style="font-size: 2.5rem; margin-bottom: 0.5rem;">Waiting for Event...</h1>
+        <h3 id="show-name" style="color: #666; margin-top: 0;"></h3>
+    </div>
+    
+    <table border="1" cellPadding="15" style="border-collapse: collapse; width: 100%; font-size: 1.2rem; text-align: center;">
+        <thead style="background-color: #f8f9fa;">
+            <tr>
+                <th>Rank</th>
+                <th>Number</th>
+                <th>Name</th>
+                <th>Score</th>
+            </tr>
+        </thead>
+        <tbody id="standings-body">
+            <tr><td colspan="4">Waiting for event data...</td></tr>
+        </tbody>
+    </table>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function updateDisplay() {
+        try {
+            const stateResponse = await fetch('/api/state/');
+            const stateData = await stateResponse.json();
+            
+            const eventNameHeader = document.getElementById('event-name');
+            const showNameHeader = document.getElementById('show-name');
+            const tbody = document.getElementById('standings-body');
+
+            if (stateData.mode !== 'EVENT' || !stateData.current_event_id) {
+                eventNameHeader.innerText = "Waiting for Next Event...";
+                showNameHeader.innerText = stateData.current_show || "";
+                tbody.innerHTML = '<tr><td colspan="4" style="padding: 2rem;">No active event running.</td></tr>';
+                return;
+            }
+
+            // Show if the event is completed or still live
+            if (stateData.event_completed) {
+                eventNameHeader.innerHTML = `<span style="color: #dc3545;">FINAL STANDINGS:</span> ${stateData.current_event}`;
+            } else {
+                eventNameHeader.innerText = `LIVE: ${stateData.current_event}`;
+            }
+            
+            showNameHeader.innerText = stateData.current_show;
+
+            const standingsResponse = await fetch(`/api/events/${stateData.current_event_id}/standings/`);
+            if (!standingsResponse.ok) throw new Error("Failed to fetch standings");
+            
+            const standings = await standingsResponse.json();
+            
+            if (standings.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="padding: 2rem;">No scores submitted yet.</td></tr>';
+                return;
+            }
+
+            // Map the rows, highlighting ties with a gold background
+            tbody.innerHTML = standings.map((row) => `
+                <tr style="${row.is_tied ? 'background-color: #fff3cd;' : ''}">
+                    <td style="font-weight: bold; font-size: 1.5rem; color: ${row.is_tied ? '#856404' : '#000'};">
+                        ${row.display_rank}
+                    </td>
+                    <td>#${row.show_number}</td>
+                    <td>${row.contestant_name}</td>
+                    <td style="font-weight: bold;">
+                        ${row.final_score.toFixed(2)}
+                        ${row.tie_breaker_score ? `<br><span style="font-size: 0.8rem; color: #666; font-weight: normal;">(TB: ${row.tie_breaker_score.toFixed(2)})</span>` : ''}
+                    </td>
+                </tr>
+            `).join('');
+
+        } catch (error) {
+            console.error("Error updating display:", error);
+        }
+    }
+
+    updateDisplay();
+    setInterval(updateDisplay, 3000);
+</script>
+{% endblock %}

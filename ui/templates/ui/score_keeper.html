@@ -1,0 +1,142 @@
+{% extends "ui/base.html" %}
+
+{% block title %}Score Keeper{% endblock %}
+
+{% block content %}
+<h1>Submit Score</h1>
+
+<!-- New Status Box for Active Event -->
+<div style="margin-bottom: 2rem; padding: 1rem; background: #e9ecef; border: 1px solid #ddd; border-radius: 5px;">
+	<h3 style="margin: 0;">Active Event: <span id="active-event-name" style="color: #0056b3;">Loading...</span></h3>
+	<p style="margin: 5px 0 0 0; font-size: 0.9em; color: #555;">Server Mode: <span id="server-mode">Loading...</span></p>
+</div>
+
+<div id="status-message"></div>
+
+{% csrf_token %}
+
+<form id="score-form">
+        <p>
+            <label>Contestant / Group:</label><br>
+            <select id="entity-id" required>
+                <option value="">Loading...</option>
+            </select>
+            <button type="button" onclick="loadContestants()" style="margin-left: 10px;">Refresh List</button>
+        </p>
+        <p>
+            <label>Score Value (Time/Points):</label><br>
+            <input type="number" step="0.01" id="score-value" required>
+        </p>
+        <p>
+            <label>
+                <input type="checkbox" id="is-tie-breaker">
+                This is a Tie-Breaker Score
+            </label>
+        </p>
+        <button type="submit" class="btn">Submit Score</button>
+    </form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function loadServerState() {
+        const eventNameSpan = document.getElementById('active-event-name');
+        const modeSpan = document.getElementById('server-mode');
+        const tieBreakerCheckbox = document.getElementById('is-tie-breaker');
+        
+        try {
+            const response = await fetch('/api/state/');
+            const data = await response.json();
+            
+            modeSpan.innerText = data.mode;
+            
+            if (data.mode === 'EVENT' && data.current_event) {
+                if (data.event_completed) {
+                    eventNameSpan.innerText = `${data.current_event} (COMPLETED - TIE BREAKERS)`;
+                    eventNameSpan.style.color = "#dc3545"; 
+                    if (tieBreakerCheckbox && !tieBreakerCheckbox.checked) tieBreakerCheckbox.checked = true;
+                } else {
+                    eventNameSpan.innerText = data.current_event;
+                    eventNameSpan.style.color = "#0056b3"; 
+                    if (tieBreakerCheckbox && tieBreakerCheckbox.checked) tieBreakerCheckbox.checked = false;
+                }
+            } else {
+                eventNameSpan.innerText = "No Event Active (Check Admin)";
+                eventNameSpan.style.color = "red";
+            }
+        } catch (error) {
+            console.error("Failed to load server state:", error);
+        }
+    }
+
+    async function loadContestants() {
+        const select = document.getElementById('entity-id');
+        const currentValue = select.value; 
+        
+        try {
+            const response = await fetch('/api/state/active-contestants/');
+            const data = await response.json();
+
+            if (response.ok) {
+                if (data.length === 0) {
+                    select.innerHTML = '<option value="">No contestants/groups registered for this event.</option>';
+                    return;
+                }
+                
+                // Note how we store 'data-is-group' on the option element itself
+                select.innerHTML = '<option value="">-- Select --</option>' + 
+                    data.map(item => `<option value="${item.id}" data-is-group="${item.is_group}">${item.label}</option>`).join('');
+                
+                if (currentValue) select.value = currentValue;
+            }
+        } catch (error) {
+            console.error("Failed to load list:", error);
+        }
+    }
+
+    loadServerState();
+    loadContestants();
+    
+    setInterval(() => {
+        loadServerState();
+    }, 3000);
+
+    document.getElementById('score-form').addEventListener('submit', async function(e) {
+        e.preventDefault(); 
+        
+        const selectElement = document.getElementById('entity-id');
+        const selectedOption = selectElement.options[selectElement.selectedIndex];
+        
+        const entityId = selectElement.value;
+        const isGroup = selectedOption.getAttribute('data-is-group') === 'true'; // Read the flag
+        const scoreValue = document.getElementById('score-value').value;
+        const isTieBreaker = document.getElementById('is-tie-breaker').checked;
+        const statusDiv = document.getElementById('status-message');
+
+        try {
+            const response = await fetch('/api/scores/submit/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+                body: JSON.stringify({
+                    entity_id: entityId,
+                    is_group: isGroup, // Tell the API if it's grading a group or a single person
+                    value: scoreValue,
+                    is_tie_breaker: isTieBreaker
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                statusDiv.innerHTML = `<p style="color: green;">${data.status}</p>`;
+                document.getElementById('score-value').value = ''; 
+                setTimeout(() => { statusDiv.innerHTML = ''; }, 3000);
+            } else {
+                statusDiv.innerHTML = `<p style="color: red;">Error: ${data.error}</p>`;
+            }
+        } catch (error) {
+            statusDiv.innerHTML = `<p style="color: red;">Network error occurred.</p>`;
+        }
+    });
+</script>
+{% endblock %}
