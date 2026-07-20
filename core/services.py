@@ -1,12 +1,16 @@
 from django.db.models import Sum, Avg, Max, Q
 from .models import Event
 
+"""
+Get the event score standings
+"""
 def get_event_standings(event_id):
-    event = Event.objects.get(id=event_id)
+    event: Event = Event.objects.get(id=event_id)
     
     standard_filter = Q(scores__is_tie_breaker=False)
     tie_breaker_filter = Q(scores__is_tie_breaker=True)
 
+    # Score Processing
     if event.score_processor == Event.ScoreProcessor.SUM:
         aggregator = Sum('scores__value', filter=standard_filter)
         tb_aggregator = Sum('scores__value', filter=tie_breaker_filter)

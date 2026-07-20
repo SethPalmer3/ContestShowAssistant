@@ -12,7 +12,7 @@ def server_state_view(request):
     state = ServerState.get_state()
     
     if request.method == 'GET':
-        return Response({
+        return Response({ # REST API response
             "mode": state.mode,
             "current_show_id": state.current_show.id if state.current_show else None,
             "current_show": state.current_show.name if state.current_show else None,
@@ -37,7 +37,10 @@ def server_state_view(request):
         return Response({"error": "Invalid mode"}, status=400)
 
 
-# Update this view to handle creating the contestant
+"""
+GET: fetch a list of contestants for a show
+POST: 
+"""
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def contestant_list_create(request, show_id):
@@ -58,36 +61,37 @@ def contestant_list_create(request, show_id):
             } for c in contestants
         ]
         return Response(data)
-        
+
     elif request.method == 'POST':
         user_role = request.user.role_profile.role
         if user_role not in [ClientRole.Role.ADMIN, ClientRole.Role.SETUP_MANAGER]:
             return Response({"error": "Unauthorized role."}, status=403)
-            
-        name = request.data.get('name')
+        contestant_name = request.data.get('name')
         show_number = request.data.get('show_number')
         event_ids = request.data.get('events', []) # Get the list of selected event IDs
-        
-        if not name or not show_number:
+
+        if not contestant_name or not show_number:
             return Response({"error": "Name and show number are required."}, status=400)
-            
+
         try:
             contestant = Contestant.objects.create(
                 show=show,
-                name=name,
+                name=contestant_name,
                 show_number=show_number
             )
-            
             # Link the selected events to the new contestant
             if event_ids:
                 contestant.events.set(event_ids)
-                
-            return Response({"status": f"Added #{show_number} {name}", "id": contestant.id})
+            return Response({"status": f"Added #{show_number} {contestant_name}", "id": contestant.id}) # Success of contestant creation
         except Exception as e:
             return Response({"error": "Could not create contestant. Make sure the show number is unique."}, status=400)
 
 
 # --- Setup Manager Endpoints ---
+
+"""
+List of shows
+"""
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def show_list_create(request):
@@ -98,6 +102,9 @@ def show_list_create(request):
     # POST logic would go here (Requires Setup Manager or Admin)
     return Response({"message": "Show creation endpoint ready."})
 
+"""
+Get a list of events tied to a given show id
+"""
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def event_list_create(request, show_id):
@@ -108,21 +115,26 @@ def event_list_create(request, show_id):
     return Response({"message": "Event creation endpoint ready."})
 
 # --- Score Keeper Endpoints ---
+
+"""
+Submitting a score for a contestant(s)
+for a given event
+"""
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def submit_score(request):
     state = ServerState.get_state()
     user_role = request.user.role_profile.role
     
-    if state.mode != ServerState.Mode.EVENT:
+    if state.mode != ServerState.Mode.EVENT: # Ensure scores are submitted while events are occuring
         return Response({"error": "Scores can only be submitted in Event Mode."}, status=403)
     
-    if user_role not in [ClientRole.Role.ADMIN, ClientRole.Role.SCORE_KEEPER]:
+    if user_role not in [ClientRole.Role.ADMIN, ClientRole.Role.SCORE_KEEPER]: # Permission check
         return Response({"error": "Unauthorized role."}, status=403)
 
     entity_id = request.data.get('entity_id')
     is_group = request.data.get('is_group', False)
-    value = request.data.get('value')
+    submitted_score_value = request.data.get('value')
     is_tie_breaker = request.data.get('is_tie_breaker', False)
 
     try:
@@ -135,7 +147,7 @@ def submit_score(request):
                     Score.objects.create(
                         event=state.current_event,
                         contestant=contestant,
-                        value=value,
+                        value=submitted_score_value,
                         is_tie_breaker=is_tie_breaker,
                         submitted_by=request.user
                     )
@@ -145,7 +157,7 @@ def submit_score(request):
                 Score.objects.create(
                     event=state.current_event,
                     contestant=contestant,
-                    value=value,
+                    value=submitted_score_value,
                     is_tie_breaker=is_tie_breaker,
                     submitted_by=request.user
                 )
@@ -158,6 +170,10 @@ def submit_score(request):
 
 
 # --- Score Display Endpoints ---
+
+"""
+Get the scores of a specific event
+"""
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def event_standings(request, event_id):
@@ -169,6 +185,9 @@ def event_standings(request, event_id):
     except Event.DoesNotExist:
         return Response({"error": "Event not found"}, status=404)
 
+"""
+Return the contestants or groups of the active event
+"""
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def active_event_contestants(request):
@@ -177,11 +196,11 @@ def active_event_contestants(request):
     if state.mode != ServerState.Mode.EVENT or not state.current_event:
         return Response({"error": "Server is not currently in Event mode."}, status=400)
     
-    event = state.current_event
+    active_event = state.current_event
     
     # If it's a group event, return the predefined ContestantGroups
-    if event.group_size > 1:
-        groups = ContestantGroup.objects.filter(events=event)
+    if active_event.group_size > 1:
+        groups = ContestantGroup.objects.filter(events=active_event)
         data = []
         for g in groups:
             # Create a string of member names so the scorekeeper knows exactly who is in the group
@@ -195,7 +214,7 @@ def active_event_contestants(request):
         
     # Otherwise, return individual contestants
     else:
-        contestants = event.registered_contestants.all().order_by('show_number')
+        contestants = active_event.registered_contestants.all().order_by('show_number')
         data = [
             {
                 "id": c.id, 
@@ -206,6 +225,10 @@ def active_event_contestants(request):
         ]
         return Response(data)
 
+"""
+Get or create groups of contestants for a event
+for a specific show
+"""
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def group_list_create(request, show_id):
@@ -227,14 +250,14 @@ def group_list_create(request, show_id):
         
     elif request.method == 'POST':
         user_role = request.user.role_profile.role
-        if user_role not in [ClientRole.Role.ADMIN, ClientRole.Role.SETUP_MANAGER]:
+        if user_role not in [ClientRole.Role.ADMIN, ClientRole.Role.SETUP_MANAGER]: # Permission check
             return Response({"error": "Unauthorized role."}, status=403)
             
-        name = request.data.get('name')
-        member_ids = request.data.get('members', [])
+        group_name = request.data.get('name')
+        group_member_ids = request.data.get('members', [])
         event_ids = request.data.get('events', [])
         
-        if not name:
+        if not group_name:
             return Response({"error": "Group name is required."}, status=400)
             
         if not event_ids:
@@ -246,23 +269,23 @@ def group_list_create(request, show_id):
             for event in events:
                 if event.group_size <= 1:
                     return Response({"error": f"Event '{event.name}' does not allow groups."}, status=400)
-                if len(member_ids) != event.group_size:
+                if len(group_member_ids) != event.group_size:
                     return Response(
-                        {"error": f"Event '{event.name}' requires exactly {event.group_size} members, but you selected {len(member_ids)}."}, 
+                        {"error": f"Event '{event.name}' requires exactly {event.group_size} members, but you selected {len(group_member_ids)}."}, 
                         status=400
                     )
-                for member_id in member_ids:
+                for member_id in group_member_ids:
                     if not event.registered_contestants.filter(id=member_id).exists():
                         return Response({"error": "All group members must be individually registered for the selected events first."}, status=400)
             
             # If validation passes, create the group
-            group = ContestantGroup.objects.create(show=show, name=name)
+            created_group = ContestantGroup.objects.create(show=show, name=group_name)
             
-            if member_ids:
-                group.members.set(member_ids)
+            if group_member_ids:
+                created_group.members.set(group_member_ids)
             if event_ids:
-                group.events.set(event_ids)
+                created_group.events.set(event_ids)
                 
-            return Response({"status": f"Created group: {name}"})
+            return Response({"status": f"Created group: {group_name}"})
         except Exception as e:
             return Response({"error": str(e)}, status=400)
