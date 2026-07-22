@@ -84,5 +84,11 @@ class ContestantGroup(models.Model):
     members = models.ManyToManyField(Contestant, related_name='group_memberships')
     events = models.ManyToManyField(Event, related_name='registered_groups')
 
+    @property
+    def display_name(self):
+        # Joins the names of all members in the format: 'name1, name2, ...'
+        return ", ".join(member.name for member in self.members.all())
+
+
     def __str__(self):
         return f"{self.name} ({self.show.name})"

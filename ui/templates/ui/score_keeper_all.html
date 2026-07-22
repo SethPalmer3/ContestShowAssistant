@@ -8,7 +8,7 @@
         <!-- Iterate through all contestants passed from the view -->
         {% for contestant in contestants %}
             <div class="contestant-row" style="display: flex; align-items: center; margin-bottom: 15px; gap: 15px;">
-                <strong style="width: 200px;">{{ contestant.name }}</strong>
+                <strong style="width: 200px;">{{ contestant.display_name }}</strong>
                 
                 <!-- Individual form for each contestant -->
                 <form method="POST" action="{% url 'submit_score' %}" class="score-form" style="display: flex; gap: 10px;">
