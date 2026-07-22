@@ -1,0 +1,76 @@
+{% extends "ui/base.html" %}
+
+{% block content %}
+<div class="score-keeper-container">
+    <h2>Keep Score</h2>
+    
+    <div class="contestants-list">
+        <!-- Iterate through all contestants passed from the view -->
+        {% for contestant in contestants %}
+            <div class="contestant-row" style="display: flex; align-items: center; margin-bottom: 15px; gap: 15px;">
+                <strong style="width: 200px;">{{ contestant.name }}</strong>
+                
+                <!-- Individual form for each contestant -->
+                <form method="POST" action="{% url 'submit_score' %}" class="score-form" style="display: flex; gap: 10px;">
+                    {% csrf_token %}
+                    
+                    <!-- Hidden field to identify which contestant is being scored -->
+                    <input type="hidden" name="contestant_id" value="{{ contestant.id }}">
+                    
+                    <!-- Enter-able score input -->
+                    <input type="number" 
+                           name="score" 
+                           placeholder="Score" 
+                           required 
+                           style="width: 100px;">
+                           
+                    <!-- Individual submit button -->
+                    <button type="submit">Submit</button>
+                </form>
+            </div>
+        {% empty %}
+            <p>No contestants found. Please add contestants to the system.</p>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Optional: Add JavaScript to submit scores asynchronously without reloading the page -->
+<script>
+document.querySelectorAll('.score-form').forEach(form => {
+    form.addEventListener('submit', function(e) {
+        e.preventDefault(); // Prevent the default page reload
+		submit_form = e.target.form;
+		contestant_id = submit_form.querySelector('[name="contestant_id"]').value;
+		score_value = submit_form.querySelector('[name="score"]').value;
+        
+        const url = this.action;
+        
+        fetch(url, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+			},
+			body: JSON.stringify({
+				entity_id: contestant_id,
+				is_group: {{is_group}}, // Tell the API if it's grading a group or a single person
+				value: score_value,
+				is_tie_breaker: False,
+			})
+        })
+        .then(response => {
+            if (response.ok) {
+                // Flash the background green to indicate success
+                const row = this.closest('.contestant-row');
+                row.style.backgroundColor = '#d4edda';
+                setTimeout(() => { row.style.backgroundColor = 'transparent'; }, 1000);
+                this.reset(); 
+            } else {
+                alert('Error saving score.');
+            }
+        })
+        .catch(error => console.error('Error:', error));
+    });
+});
+</script>
+{% endblock %}

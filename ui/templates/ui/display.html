@@ -3,14 +3,18 @@
 {% block title %}Live Event Standings{% endblock %}
 
 {% block content %}
+<style>
+table {border-collapse: collapse; table-layout: fixed; margin: 20px; width: 100%; font-size: 1.2rem; text-align: center;}
+
+</style>
     <div style="text-align: center; margin-bottom: 2rem;">
         <h1 id="event-name" style="font-size: 2.5rem; margin-bottom: 0.5rem;">Waiting for Event...</h1>
         <h3 id="show-name" style="color: #666; margin-top: 0;"></h3>
     </div>
     
-    <table border="1" cellPadding="15" style="border-collapse: collapse; width: 100%; font-size: 1.2rem; text-align: center;">
+    <table border="1" cellPadding="15" >
         <thead style="background-color: #f8f9fa;">
-            <tr>
+            <tr class="table-header">
                 <th>Rank</th>
                 <th>Number</th>
                 <th>Name</th>
@@ -66,7 +70,7 @@
                     <td style="font-weight: bold; font-size: 1.5rem; color: ${row.is_tied ? '#856404' : '#000'};">
                         ${row.display_rank}
                     </td>
-                    <td>#${row.show_number}</td>
+                    <td>${row.show_number}</td>
                     <td>${row.contestant_name}</td>
                     <td style="font-weight: bold;">
                         ${row.final_score.toFixed(2)}

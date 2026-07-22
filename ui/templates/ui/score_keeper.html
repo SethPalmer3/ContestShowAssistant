@@ -104,10 +104,10 @@
     document.getElementById('score-form').addEventListener('submit', async function(e) {
         e.preventDefault(); 
         
-        const selectElement = document.getElementById('entity-id');
-        const selectedOption = selectElement.options[selectElement.selectedIndex];
+        const contestantIdElement = document.getElementById('entity-id');
+        const selectedOption = contestantIdElement.options[contestantIdElement.selectedIndex];
         
-        const entityId = selectElement.value;
+        const contestantId = contestantIdElement.value;
         const isGroup = selectedOption.getAttribute('data-is-group') === 'true'; // Read the flag
         const scoreValue = document.getElementById('score-value').value;
         const isTieBreaker = document.getElementById('is-tie-breaker').checked;
@@ -118,7 +118,7 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
                 body: JSON.stringify({
-                    entity_id: entityId,
+                    entity_id: contestantId,
                     is_group: isGroup, // Tell the API if it's grading a group or a single person
                     value: scoreValue,
                     is_tie_breaker: isTieBreaker
