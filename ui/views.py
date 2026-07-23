@@ -30,7 +30,7 @@ def score_keeper(request):
 
     context = {
         'contestants': all_contestants,
-        'is_group':  (event.group_size > 1),
+        'is_group':  str(event.group_size > 1).lower(),
     }
 
 

@@ -39,7 +39,7 @@
 document.querySelectorAll('.score-form').forEach(form => {
     form.addEventListener('submit', function(e) {
         e.preventDefault(); // Prevent the default page reload
-		submit_form = e.target.form;
+		submit_form = e.target;
 		contestant_id = submit_form.querySelector('[name="contestant_id"]').value;
 		score_value = submit_form.querySelector('[name="score"]').value;
         
@@ -47,15 +47,15 @@ document.querySelectorAll('.score-form').forEach(form => {
         
         fetch(url, {
             method: 'POST',
-            body: formData,
             headers: {
-                'X-Requested-With': 'XMLHttpRequest'
+                'Content-Type': 'application/json', 
+				'X-CSRFToken': csrftoken,
 			},
 			body: JSON.stringify({
 				entity_id: contestant_id,
 				is_group: {{is_group}}, // Tell the API if it's grading a group or a single person
 				value: score_value,
-				is_tie_breaker: False,
+				is_tie_breaker: false,
 			})
         })
         .then(response => {
