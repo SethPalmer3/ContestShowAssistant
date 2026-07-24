@@ -22,8 +22,13 @@
                            name="score" 
                            placeholder="Score" 
                            required 
-                           style="width: 100px;">
+                           style="width: 20em;">
                            
+					<label style=" padding-left: 1.5em; padding-right: 1.5em;">
+						TB
+						<br>
+						<input type="checkbox" id="is-tie-breaker" style="accent-color: #0056b3; width: 1.5em; height: 1.5em;">
+					</label>
                     <!-- Individual submit button -->
                     <button type="submit">Submit</button>
                 </form>
@@ -42,6 +47,7 @@ document.querySelectorAll('.score-form').forEach(form => {
 		submit_form = e.target;
 		contestant_id = submit_form.querySelector('[name="contestant_id"]').value;
 		score_value = submit_form.querySelector('[name="score"]').value;
+		isTieBreaker = submit_form.querySelector('[id="is-tie-breaker"]').checked;
         
         const url = this.action;
         
@@ -55,7 +61,7 @@ document.querySelectorAll('.score-form').forEach(form => {
 				entity_id: contestant_id,
 				is_group: {{is_group}}, // Tell the API if it's grading a group or a single person
 				value: score_value,
-				is_tie_breaker: false,
+				is_tie_breaker: isTieBreaker,
 			})
         })
         .then(response => {

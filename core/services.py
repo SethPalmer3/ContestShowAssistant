@@ -87,6 +87,7 @@ def get_event_standings(event_id):
             contestant_number = contestant_number[:-2]
         else:
             contestant_name = c.name
+            contestant_number = c.show_number
 
         standings.append({
             "contestant_name": contestant_name,

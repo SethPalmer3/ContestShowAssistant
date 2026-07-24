@@ -4,11 +4,14 @@ from rest_framework.permissions import IsAuthenticated
 from state.models import ServerState, ClientRole
 from core.models import Show, Event, Contestant, Score, ContestantGroup
 from core.services import get_event_standings
+from django.http import HttpRequest
+from django.db.models import Sum, Avg, Max, Q
+
 
 # --- Server State & Admin Controls ---
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
-def server_state_view(request):
+def server_state_view(request: HttpRequest):
     state = ServerState.get_state()
     
     if request.method == 'GET':
@@ -94,7 +97,7 @@ List of shows
 """
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
-def show_list_create(request):
+def show_list_create(request: HttpRequest):
     if request.method == 'GET':
         shows = Show.objects.all().values('id', 'name', 'date')
         return Response(list(shows))
@@ -107,7 +110,7 @@ Get a list of events tied to a given show id
 """
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
-def event_list_create(request, show_id):
+def event_list_create(request: HttpRequest, show_id):
     if request.method == 'GET':
         events = Event.objects.filter(show_id=show_id).values()
         return Response(list(events))
@@ -116,13 +119,86 @@ def event_list_create(request, show_id):
 
 # --- Score Keeper Endpoints ---
 
+def get_aggregation_function(event):
+    """Maps the event's score processor to a Django aggregation class."""
+    processor_map = {
+        'SUM': Sum,
+        'AVG': Avg,
+        'MAX': Max,
+    }
+    # Provide a fallback, though the model uses choices
+    return processor_map.get(event.score_processor, Sum)
+
+def find_contestant_ties(current_event: Event, target_contestant: Contestant):
+    agg_func = get_aggregation_function(current_event)
+    
+    # Annotate all registered contestants with their processed score for this event
+    contestants = Contestant.objects.filter(
+        events=current_event
+    ).annotate(
+        final_score=agg_func(
+            'scores__value', 
+            filter=Q(scores__event=current_event)
+        )
+    ).exclude(final_score__isnull=True) # Exclude contestants with no scores yet
+
+    try:
+        # Retrieve the target's calculated score
+        target_score = contestants.get(pk=target_contestant.pk).final_score
+        
+        # Find others with the exact same score
+        tied_contestants = contestants.filter(
+            final_score=target_score
+        ).exclude(pk=target_contestant.pk)
+        
+        return target_score, tied_contestants
+        
+    except Contestant.DoesNotExist:
+        return None, Contestant.objects.none()
+
+def find_group_ties(current_event, target_group):
+    agg_func = get_aggregation_function(current_event)
+    
+    # Annotate all registered groups by aggregating scores through their members
+    groups = ContestantGroup.objects.filter(
+        events=current_event
+    ).annotate(
+        final_score=agg_func(
+            'members__scores__value', 
+            filter=Q(members__scores__event=current_event)
+        )
+    ).exclude(final_score__isnull=True)
+    
+    try:
+        target_score = groups.get(pk=target_group.pk).final_score
+        
+        tied_groups = groups.filter(
+            final_score=target_score
+        ).exclude(pk=target_group.pk)
+        
+        return target_score, tied_groups
+        
+    except ContestantGroup.DoesNotExist:
+        return None, ContestantGroup.objects.none()
+
+def auto_detect_tie_braker(request: HttpRequest) -> bool:
+    entity_id = request.data.get('entity_id')
+    is_group = bool(request.data.get('is_group', False))
+    contestant_type: type[ContestantGroup]|type[Contestant] = ContestantGroup if is_group else Contestant
+    contestant = contestant_type.objects.get(id=entity_id)
+    server_state = ServerState.get_state()
+    current_event = server_state.current_event
+    _, ties = find_group_ties(current_event=current_event, target_group=contestant) if is_group else find_contestant_ties(current_event=current_event, target_contestant=contestant)
+    return ties.exists()
+    
+
 """
 Submitting a score for a contestant(s)
 for a given event
 """
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
-def submit_score(request):
+def submit_score(request: HttpRequest):
     state = ServerState.get_state()
     user_role = request.user.role_profile.role
     
@@ -135,7 +211,7 @@ def submit_score(request):
     entity_id = request.data.get('entity_id')
     is_group = request.data.get('is_group', False)
     submitted_score_value = request.data.get('value')
-    is_tie_breaker = request.data.get('is_tie_breaker', False)
+    is_tie_breaker = request.data.get('is_tie_breaker', auto_detect_tie_braker(request))
 
     try:
         from django.db import transaction
@@ -176,7 +252,7 @@ Get the scores of a specific event
 """
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
-def event_standings(request, event_id):
+def event_standings(request: HttpRequest, event_id):
     try:
         # The service now returns a fully formatted list of dictionaries, 
         # so we can just pass it directly to the Response.
@@ -190,7 +266,7 @@ Return the contestants or groups of the active event
 """
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
-def active_event_contestants(request):
+def active_event_contestants(request: HttpRequest):
     state = ServerState.get_state()
     
     if state.mode != ServerState.Mode.EVENT or not state.current_event:
@@ -231,7 +307,7 @@ for a specific show
 """
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
-def group_list_create(request, show_id):
+def group_list_create(request: HttpRequest, show_id):
     try:
         show = Show.objects.get(id=show_id)
     except Show.DoesNotExist:

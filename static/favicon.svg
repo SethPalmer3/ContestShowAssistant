@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Stopwatch Body -->
+  <circle cx="50" cy="55" r="40" fill="#0056b3" stroke="#1a1a1a" stroke-width="4"/>
+  <circle cx="50" cy="55" r="32" fill="#ffffff"/>
+  
+  <!-- Top Button -->
+  <rect x="40" y="4" width="20" height="10" rx="3" fill="#1a1a1a"/>
+  
+  <!-- Angled Button -->
+  <rect x="73" y="13" width="12" height="8" rx="2" fill="#1a1a1a" transform="rotate(45 79 17)"/>
+  
+  <!-- Hand -->
+  <line x1="50" y1="55" x2="50" y2="30" stroke="#dc3545" stroke-width="5" stroke-linecap="round"/>
+  
+  <!-- Center dot -->
+  <circle cx="50" cy="55" r="5" fill="#1a1a1a"/>
+</svg>
