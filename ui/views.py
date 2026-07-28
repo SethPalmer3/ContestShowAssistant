@@ -31,6 +31,8 @@ def score_keeper(request):
     context = {
         'contestants': all_contestants,
         'is_group':  str(event.group_size > 1).lower(),
+        'is_completed': server_state.current_event.is_completed,
+        'is_finalized': server_state.current_event.is_finalized
     }
 
 
@@ -39,3 +41,6 @@ def score_keeper(request):
 def score_display(request):
     # Might not need login if you want this to be a public screen
     return render(request, 'ui/display.html')
+
+def admin_panel(request):
+    return render(request, "ui/admin_panel.html")

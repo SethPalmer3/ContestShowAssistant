@@ -211,7 +211,10 @@ def submit_score(request: HttpRequest):
     entity_id = request.data.get('entity_id')
     is_group = request.data.get('is_group', False)
     submitted_score_value = request.data.get('value')
-    is_tie_breaker = request.data.get('is_tie_breaker', auto_detect_tie_braker(request))
+    print(f"({state.current_event.name}) - is_complete: {state.current_event.is_completed} is_finalized: {state.current_event.is_finalized}")
+    default_tie_breaker = state.current_event.is_completed and not state.current_event.is_finalized
+    is_tie_breaker = default_tie_breaker
+    # is_tie_breaker = request.data.get('is_tie_breaker', default_tie_breaker)
 
     try:
         from django.db import transaction
@@ -365,3 +368,15 @@ def group_list_create(request: HttpRequest, show_id):
             return Response({"status": f"Created group: {group_name}"})
         except Exception as e:
             return Response({"error": str(e)}, status=400)
+
+"""
+Stop the current event
+"""
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def event_stop(request: HttpRequest, event_id):
+    current_event = Event.objects.get(id=event_id)
+    current_event.is_completed = True
+    current_event.save()
+    return Response({"status": f"Stopped event: {current_event.name}"})
+    

@@ -1,0 +1,234 @@
+{% extends "ui/base.html" %} <!--[cite: 5] -->
+
+{% block title %}Admin Panel{% endblock %}
+
+{% block content %}
+    <h1>Event Administration</h1>
+    
+    <!-- Header displaying current Show and Event -->
+    <div style="margin-bottom: 2rem; padding: 1rem; background: #f8f9fa; border: 1px solid #ddd; border-radius: 5px;">
+        <h3 style="margin: 0;">Active Show: <span id="admin-active-show" style="color: #0056b3;">Loading...</span></h3>
+        <h3 style="margin: 5px 0 0 0;">Active Event: <span id="admin-active-event" style="color: #0056b3;">Loading...</span></h3>
+        <p style="margin: 5px 0 0 0; font-size: 0.9em; color: #555;">Event Status: <strong id="admin-event-status">Loading...</strong></p>
+    </div>
+
+    <div id="admin-action-status"></div>
+
+    <div id="admin-controls" style="display: none;">
+        
+        <!-- Active Event Controls -->
+        <div style="margin-bottom: 2rem; padding: 1.5rem; border: 1px solid #ccc; background: #fff; border-radius: 5px;">
+            <h2>Current Event Actions</h2>
+            <p style="color: #555;">Use these controls to transition the state of the active event.</p>
+            
+            <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                <!-- Stops standard scoring and signals the Score Keeper to enable tie-breakers -->
+                <button id="btn-stop-event" class="btn" style="background-color: #ffc107; color: #000;">
+                    Stop Current Event (Allow Tie-Breakers)
+                </button>
+                
+                <!-- Marks the event as fully completed in the database -->
+                <button id="btn-finalize-event" class="btn" style="background-color: #dc3545; color: #fff;">
+                    Finalize Current Event
+                </button>
+            </div>
+        </div>
+
+        <!-- Next Event Selector -->
+        <div style="margin-bottom: 2rem; padding: 1.5rem; border: 1px solid #ccc; background: #fff; border-radius: 5px;">
+            <h2>Advance to Next Event</h2>
+            <p style="color: #555;">Select and start the next event for this show.</p>
+            
+            <form id="next-event-form" style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+                <select id="next-event-select" required style="min-width: 250px;">
+                    <option value="">Loading events...</option>
+                </select>
+                <button type="submit" class="btn" style="background-color: #28a745; color: #fff;">
+                    Start Selected Event
+                </button>
+            </form>
+        </div>
+
+        <hr style="margin: 2rem 0;">
+
+        <div style="margin-bottom: 2rem; padding: 1.5rem; border: 1px solid #ccc; background: #fff; border-radius: 5px;">
+            <h2>Configuration Pages</h2>
+            <p style="color: #555;">Quick links to the default Django admin database management.</p>
+            
+            <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                <!-- Adjust 'app_name' in the URL to match your actual Django app's name -->
+                <a href="/admin/core/contestant/" class="btn" style="background: #e9ecef; border: 1px solid #ddd; border-radius: 5px; padding: 1rem; text-decoration: none; color: black; font-weight: 600; text-align: center;">
+                    Configure Contestants
+                </a> 
+                
+                <a href="/admin/core/contestantgroup/" class="btn" style="background: #e9ecef; border: 1px solid #ddd; border-radius: 5px; padding: 1rem; text-decoration: none; color: black; font-weight: 600; text-align: center;">
+                    Configure Groups
+                </a>
+            </div>
+        </div>
+
+    </div>
+
+    <p id="no-admin-state-warning" style="color: red; display: none;">
+        Unable to connect to server state. Please ensure the backend is running.
+    </p>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let currentShowId = null;
+    let currentEventId = null;
+
+    async function initAdminPanel() {
+        try {
+            const stateRes = await fetch('/api/state/');
+            const stateData = await stateRes.json();
+            
+            const showDisplay = document.getElementById('admin-active-show');
+            const eventDisplay = document.getElementById('admin-active-event');
+            const statusDisplay = document.getElementById('admin-event-status');
+            const controls = document.getElementById('admin-controls');
+            const warning = document.getElementById('no-admin-state-warning');
+            
+            const btnStop = document.getElementById('btn-stop-event');
+            const btnFinalize = document.getElementById('btn-finalize-event');
+
+            if (stateData.current_show_id) {
+                currentShowId = stateData.current_show_id;
+                currentEventId = stateData.current_event_id;
+                
+                showDisplay.innerText = stateData.current_show;
+                controls.style.display = 'block';
+                warning.style.display = 'none';
+
+                if (stateData.mode === 'EVENT' && stateData.current_event) {
+                    eventDisplay.innerText = stateData.current_event;
+                    
+                    if (stateData.event_completed) {
+                        statusDisplay.innerText = "TIE-BREAKERS / COMPLETED"; 
+                        statusDisplay.style.color = "#dc3545";
+                        btnStop.disabled = true;
+                        btnFinalize.disabled = false;
+                    } else {
+                        statusDisplay.innerText = "LIVE (MAIN SCORING)";
+                        statusDisplay.style.color = "#28a745";
+                        btnStop.disabled = false;
+                        btnFinalize.disabled = false;
+                    }
+                } else {
+                    eventDisplay.innerText = "None";
+                    statusDisplay.innerText = "WAITING";
+                    statusDisplay.style.color = "#666";
+                    btnStop.disabled = true;
+                    btnFinalize.disabled = true;
+                }
+
+                loadUpcomingEvents();
+            } else {
+                showDisplay.innerText = "No Active Show";
+                controls.style.display = 'none';
+                warning.style.display = 'block';
+            }
+        } catch (error) {
+            console.error("Error fetching state:", error);
+        }
+    }
+
+    async function loadUpcomingEvents() {
+        if (!currentShowId) return;
+        try {
+            const res = await fetch(`/api/shows/${currentShowId}/events/`); //[cite: 1]
+            const events = await res.json();
+            
+            const select = document.getElementById('next-event-select');
+            
+            if (events.length === 0) {
+                select.innerHTML = '<option value="">No events available</option>';
+                return;
+            }
+
+            // Filter out events that are already completed, if applicable
+            select.innerHTML = '<option value="">-- Select Event --</option>' + 
+                events.map(e => `<option value="${e.id}">${e.name} (Size: ${e.group_size})</option>`).join('');
+                
+        } catch (error) {
+            console.error("Failed to load events");
+        }
+    }
+
+    function showStatus(message, isError=false) {
+        const div = document.getElementById('admin-action-status');
+        div.innerHTML = `<div style="padding: 1rem; margin-bottom: 1rem; border-radius: 5px; background: ${isError ? '#f8d7da' : '#d4edda'}; color: ${isError ? '#721c24' : '#155724'};">${message}</div>`;
+        setTimeout(() => { div.innerHTML = ''; }, 4000);
+    }
+
+    // Stop Event / Trigger Tie-Breakers
+    document.getElementById('btn-stop-event').addEventListener('click', async function() {
+        if (!currentEventId) return;
+        if (!confirm("Are you sure you want to stop main scoring and move to tie-breakers?")) return;
+
+        try {
+            const res = await fetch(`/api/events/${currentEventId}/stop/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken }
+            });
+            if (res.ok) {
+                showStatus("Event stopped. Tie-breakers are now active.");
+                initAdminPanel();
+            } else {
+                showStatus("Error stopping event.", true);
+            }
+        } catch (error) {
+            showStatus("Network error.", true);
+        }
+    });
+
+    // Finalize Event
+    document.getElementById('btn-finalize-event').addEventListener('click', async function() {
+        if (!currentEventId) return;
+        if (!confirm("Are you sure you want to finalize this event? No more scores can be submitted.")) return;
+
+        try {
+            const res = await fetch(`/api/events/${currentEventId}/finalize/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken }
+            });
+            if (res.ok) {
+                showStatus("Event finalized successfully.");
+                initAdminPanel();
+            } else {
+                showStatus("Error finalizing event.", true);
+            }
+        } catch (error) {
+            showStatus("Network error.", true);
+        }
+    });
+
+    // Start Next Event
+    document.getElementById('next-event-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const nextEventId = document.getElementById('next-event-select').value;
+        if (!nextEventId) return;
+
+        try {
+            const res = await fetch(`/api/state/set-event/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken }, //[cite: 5]
+                body: JSON.stringify({ event_id: nextEventId })
+            });
+            if (res.ok) {
+                showStatus("Next event started successfully.");
+                initAdminPanel();
+            } else {
+                showStatus("Error starting next event.", true);
+            }
+        } catch (error) {
+            showStatus("Network error.", true);
+        }
+    });
+
+    // Initialize on load and poll for state changes
+    initAdminPanel();
+    setInterval(initAdminPanel, 5000);
+</script>
+{% endblock %}

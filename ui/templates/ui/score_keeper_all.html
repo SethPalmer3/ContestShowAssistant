@@ -2,7 +2,7 @@
 
 {% block content %}
 <div class="score-keeper-container">
-    <h2>Keep Score</h2>
+	<h2>Keep Score</h2>
     
     <div class="contestants-list">
         <!-- Iterate through all contestants passed from the view -->
@@ -41,6 +41,13 @@
 
 <!-- Optional: Add JavaScript to submit scores asynchronously without reloading the page -->
 <script>
+	async function updateHeader() {
+		const stateResponse = await fetch('/api/state/');
+		const stateData = await stateResponse.json();
+		const headerContainer = document.getElementsByName("header_block");
+		headerContainer.innerHTML = stateData.current_event ;
+	}
+
 document.querySelectorAll('.score-form').forEach(form => {
     form.addEventListener('submit', function(e) {
         e.preventDefault(); // Prevent the default page reload
@@ -78,5 +85,7 @@ document.querySelectorAll('.score-form').forEach(form => {
         .catch(error => console.error('Error:', error));
     });
 });
+updateHeader();
+setInterval(updateHeader, 5000);
 </script>
 {% endblock %}

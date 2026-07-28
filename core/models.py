@@ -39,6 +39,7 @@ class Event(models.Model):
     score_order = models.CharField(max_length=10, choices=ScoreOrder.choices, help_text="How to sort the results of multiple scores")
     score_processor = models.CharField(max_length=10, choices=ScoreProcessor.choices, help_text="How to combine multiple scores")
     is_completed = models.BooleanField(default=False)
+    is_finalized = models.BooleanField(default=False)
 
     def __str__(self):
         return self.name.__str__()

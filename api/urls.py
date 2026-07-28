@@ -26,4 +26,7 @@ urlpatterns = [
 
     # Add Groups
     path('shows/<int:show_id>/groups/', views.group_list_create, name='group_list_create'),
+
+    path('events/<int:event_id>/stop/', views.event_stop, name="event_stop"),
 ]
+
