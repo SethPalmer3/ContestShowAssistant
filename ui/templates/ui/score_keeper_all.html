@@ -2,7 +2,7 @@
 
 {% block content %}
 <div class="score-keeper-container">
-	<h2 id="header-block">Keep Score</h2>
+	<h2>Keep Score</h2>
     
     <div class="contestants-list">
         <!-- Iterate through all contestants passed from the view -->
@@ -27,7 +27,7 @@
 					<label style=" padding-left: 1.5em; padding-right: 1.5em;">
 						TB
 						<br>
-						<input type="checkbox" name="is-tie-breaker" style="accent-color: #0056b3; width: 1.5em; height: 1.5em;">
+						<input type="checkbox" id="is-tie-breaker" style="accent-color: #0056b3; width: 1.5em; height: 1.5em;">
 					</label>
                     <!-- Individual submit button -->
                     <button type="submit">Submit</button>
@@ -44,21 +44,17 @@
 	async function updateHeader() {
 		const stateResponse = await fetch('/api/state/');
 		const stateData = await stateResponse.json();
-		const headerContainer = document.getElementById("header-block");
-		headerContainer.innerHTML = `Keep Score: ${stateData.current_event}`;
-		document.getElementsByName("is-tie-breaker").forEach(btn => {
-			btn.checked = stateData.event_completed;
-		});
+		const headerContainer = document.getElementsByName("header_block");
+		headerContainer.innerHTML = stateData.current_event ;
 	}
 
 document.querySelectorAll('.score-form').forEach(form => {
     form.addEventListener('submit', function(e) {
-		const stateResponse = await fetch('/api/state/');
-		const stateData = await stateResponse.json();
         e.preventDefault(); // Prevent the default page reload
 		submit_form = e.target;
 		contestant_id = submit_form.querySelector('[name="contestant_id"]').value;
 		score_value = submit_form.querySelector('[name="score"]').value;
+		isTieBreaker = submit_form.querySelector('[id="is-tie-breaker"]').checked;
         
         const url = this.action;
         
@@ -90,6 +86,6 @@ document.querySelectorAll('.score-form').forEach(form => {
     });
 });
 updateHeader();
-<!-- setInterval(updateHeader, 5000); -->
+setInterval(updateHeader, 5000);
 </script>
 {% endblock %}
