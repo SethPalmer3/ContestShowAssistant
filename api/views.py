@@ -204,6 +204,9 @@ def submit_score(request: HttpRequest):
     
     if state.mode != ServerState.Mode.EVENT: # Ensure scores are submitted while events are occuring
         return Response({"error": "Scores can only be submitted in Event Mode."}, status=403)
+
+    # if state.current_event.is_finalized:
+    #     return Response({"error": "This event has been finalized, scores can no longer be submitted."}, status=403)
     
     if user_role not in [ClientRole.Role.ADMIN, ClientRole.Role.SCORE_KEEPER]: # Permission check
         return Response({"error": "Unauthorized role."}, status=403)
@@ -211,7 +214,6 @@ def submit_score(request: HttpRequest):
     entity_id = request.data.get('entity_id')
     is_group = request.data.get('is_group', False)
     submitted_score_value = request.data.get('value')
-    print(f"({state.current_event.name}) - is_complete: {state.current_event.is_completed} is_finalized: {state.current_event.is_finalized}")
     default_tie_breaker = state.current_event.is_completed and not state.current_event.is_finalized
     is_tie_breaker = default_tie_breaker
     # is_tie_breaker = request.data.get('is_tie_breaker', default_tie_breaker)
@@ -379,4 +381,14 @@ def event_stop(request: HttpRequest, event_id):
     current_event.is_completed = True
     current_event.save()
     return Response({"status": f"Stopped event: {current_event.name}"})
-    
+
+"""
+Stop the current event
+"""
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def event_finalize(request: HttpRequest, event_id):
+    current_event = Event.objects.get(id=event_id)
+    current_event.is_finalized = True
+    current_event.save()
+    return Response({"status": f"Finalized event: {current_event.name}"})
