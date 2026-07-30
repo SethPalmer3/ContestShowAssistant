@@ -104,12 +104,18 @@
                 if (stateData.mode === 'EVENT' && stateData.current_event) {
                     eventDisplay.innerText = stateData.current_event;
                     
-                    if (stateData.event_completed) {
+					if(stateData.event_finalized) {
+                        statusDisplay.innerText = "FINALIZED"; 
+                        statusDisplay.style.color = "#dc3545";
+                        btnStop.disabled = true;
+                        btnFinalize.disabled = false;
+
+					} else if (stateData.event_completed) {
                         statusDisplay.innerText = "TIE-BREAKERS / COMPLETED"; 
                         statusDisplay.style.color = "#dc3545";
                         btnStop.disabled = true;
                         btnFinalize.disabled = false;
-                    } else {
+					} else {
                         statusDisplay.innerText = "LIVE (MAIN SCORING)";
                         statusDisplay.style.color = "#28a745";
                         btnStop.disabled = false;

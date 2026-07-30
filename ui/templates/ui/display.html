@@ -46,8 +46,10 @@ table {border-collapse: collapse; table-layout: fixed; margin: 20px; width: 100%
             }
 
             // Show if the event is completed or still live
-            if (stateData.event_completed) {
+			if (stateData.event_finalized){
                 eventNameHeader.innerHTML = `<span style="color: #dc3545;">FINAL STANDINGS:</span> ${stateData.current_event}`;
+			} else if (stateData.event_completed) {
+				eventNameHeader.innerHTML = `<span style="color: #dc3545;">TIE BREAKER:</span> ${stateData.current_event}`;
             } else {
                 eventNameHeader.innerText = `LIVE: ${stateData.current_event}`;
             }

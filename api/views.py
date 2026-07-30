@@ -387,6 +387,6 @@ Stop the current event
 @permission_classes([IsAuthenticated])
 def event_finalize(request: HttpRequest, event_id):
     current_event = Event.objects.get(id=event_id)
-    current_event.is_completed = True
+    current_event.is_finalized = True
     current_event.save()
-    return Response({"status": f"Stopped event: {current_event.name}"})
+    return Response({"status": f"Finalized event: {current_event.name}"})
