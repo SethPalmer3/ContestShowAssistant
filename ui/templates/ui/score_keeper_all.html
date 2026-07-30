@@ -2,7 +2,7 @@
 
 {% block content %}
 <div class="score-keeper-container">
-	<h2>Keep Score</h2>
+	<h2>Keep Score: <span id="header-block"></span></h2>
     
     <div class="contestants-list">
         <!-- Iterate through all contestants passed from the view -->
@@ -27,10 +27,10 @@
 					<label style=" padding-left: 1.5em; padding-right: 1.5em;">
 						TB
 						<br>
-						<input type="checkbox" id="is-tie-breaker" style="accent-color: #0056b3; width: 1.5em; height: 1.5em;">
+						<input type="checkbox" name="tie-breaker" id="is-tie-breaker" style="accent-color: #0056b3; width: 1.5em; height: 1.5em;" {% if is_completed %}checked{% endif %}>
 					</label>
                     <!-- Individual submit button -->
-                    <button type="submit">Submit</button>
+					<button type="submit" style="visibility: {% if is_finalized %}hidden{% else %}visible{% endif %}">Submit</button>
                 </form>
             </div>
         {% empty %}
@@ -44,8 +44,16 @@
 	async function updateHeader() {
 		const stateResponse = await fetch('/api/state/');
 		const stateData = await stateResponse.json();
-		const headerContainer = document.getElementsByName("header_block");
-		headerContainer.innerHTML = stateData.current_event ;
+		const headerContainer = document.getElementById("header-block");
+		if(stateData.mode !== 'EVENT' || !stateData.current_event_id){
+			headerContainer.innerHTML = `Waiting for next Event...`;
+		}else{
+			headerContainer.innerHTML = `${stateData.current_event}`;
+			headerContainer.style.color = "#0056b3";
+		}
+		<!-- document.getElementsByName("tie-breaker").forEach(chk => { -->
+		<!-- 	chk.checked = stateData.event_completed && !stateData.event_finalized; -->
+		<!-- }); -->
 	}
 
 document.querySelectorAll('.score-form').forEach(form => {
@@ -86,6 +94,6 @@ document.querySelectorAll('.score-form').forEach(form => {
     });
 });
 updateHeader();
-setInterval(updateHeader, 5000);
+<!-- setInterval(updateHeader, 5000); -->
 </script>
 {% endblock %}

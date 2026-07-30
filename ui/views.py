@@ -35,7 +35,6 @@ def score_keeper(request):
         'is_finalized': server_state.current_event.is_finalized
     }
 
-
     return render(request, 'ui/score_keeper_all.html', context)
 
 def score_display(request):

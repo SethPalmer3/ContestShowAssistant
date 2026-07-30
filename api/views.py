@@ -22,8 +22,8 @@ def server_state_view(request: HttpRequest):
             "current_event_id": state.current_event.id if state.current_event else None,
             "current_event": state.current_event.name if state.current_event else None,
             "current_event_group_size": state.current_event.group_size if state.current_event else 1,
-            # Add this line so the UI knows if the event is done:
-            "event_completed": state.current_event.is_completed if state.current_event else False
+            "event_completed": state.current_event.is_completed if state.current_event else False,
+            "event_finalized": state.current_event.is_finalized if state.current_event else False
         })
         
     elif request.method == 'POST':
@@ -380,3 +380,13 @@ def event_stop(request: HttpRequest, event_id):
     current_event.save()
     return Response({"status": f"Stopped event: {current_event.name}"})
     
+"""
+Stop the current event
+"""
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def event_finalize(request: HttpRequest, event_id):
+    current_event = Event.objects.get(id=event_id)
+    current_event.is_completed = True
+    current_event.save()
+    return Response({"status": f"Stopped event: {current_event.name}"})
